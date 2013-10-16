@@ -12,7 +12,7 @@ from twisted.python import log
 
 from twisted.web.static import File
 from twisted.web.server import Site
-from twisted.web.websockets import WebSocketsResource, lookupProtocolForFactory
+from websockets import WebSocketsResource, lookupProtocolForFactory
 
 from django.core import signing
 

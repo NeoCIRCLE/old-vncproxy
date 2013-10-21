@@ -399,7 +399,6 @@ class WebSocketsProtocol(Protocol):
         Find frames in incoming data and pass them to the underlying protocol.
         """
         for opcode, data, fin in _parseFrames(self._buffer):
-            self._receiver.frameReceived(opcode, base64.b64decode(data), fin)
             if opcode == CONTROLS.CLOSE:
                 # The other side wants us to close.
                 code, reason = data
@@ -416,6 +415,7 @@ class WebSocketsProtocol(Protocol):
                 # 5.5.3 PONGs must contain the data that was sent with the
                 # provoking PING.
                 self.transport.write(_makeFrame(data, CONTROLS.PONG, True))
+            self._receiver.frameReceived(opcode, base64.b64decode(data), fin)
 
 
     def dataReceived(self, data):

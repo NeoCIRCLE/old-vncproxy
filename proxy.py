@@ -65,7 +65,8 @@ class VNCWebSocketHandler(Protocol):
             port = value['port']
             host = value['host']
         except:
-            pass
+            transport.loseConnection()
+            return
         self.transport = transport
         self.srv_queue = defer.DeferredQueue()
         self.cli_queue = defer.DeferredQueue()
@@ -87,7 +88,8 @@ class VNCWebSocketHandler(Protocol):
         self.cli_queue.put(frame)
 
     def connectionLost(self, why):
-        self.cli_queue.put(False)
+        if hasattr(self, 'cli_queue'):
+            self.cli_queue.put(False)
         log.msg("HELO")
 
 

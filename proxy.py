@@ -129,6 +129,6 @@ if __name__ == "__main__":
     logging.basicConfig(level=opts.loglevel)
     resource = File('.')
     resource.putChild('vnc', WebSocketsResource(
-            lookupProtocolForFactory(VNCWebSocketFactory())))
+        lookupProtocolForFactory(VNCWebSocketFactory())))
     reactor.listenTCP(9999, Site(resource))
     reactor.run()

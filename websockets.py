@@ -31,12 +31,10 @@ from twisted.web.resource import IResource
 from twisted.web.server import NOT_DONE_YET
 
 
-
 class _WSException(Exception):
     """
     Internal exception for control flow inside the WebSockets frame parser.
     """
-
 
 
 class CONTROLS(Values):
@@ -52,7 +50,6 @@ class CONTROLS(Values):
     CLOSE = ValueConstant(8)
     PING = ValueConstant(9)
     PONG = ValueConstant(10)
-
 
 
 class STATUSES(Values):
@@ -76,10 +73,8 @@ class STATUSES(Values):
     TLS_HANDSHAKE_FAILED = ValueConstant(1056)
 
 
-
 # The GUID for WebSockets, from RFC 6455.
 _WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
-
 
 
 def _makeAccept(key):
@@ -93,7 +88,6 @@ def _makeAccept(key):
     @return: An encoded response.
     """
     return sha1("%s%s" % (key, _WS_GUID)).digest().encode("base64").strip()
-
 
 
 def _mask(buf, key):
@@ -114,7 +108,6 @@ def _mask(buf, key):
     for i, char in enumerate(buf):
         buf[i] = chr(ord(char) ^ key[i % 4])
     return "".join(buf)
-
 
 
 def _makeFrame(buf, opcode, fin, mask=None):
@@ -162,7 +155,6 @@ def _makeFrame(buf, opcode, fin, mask=None):
         buf = "%s%s" % (mask, _mask(buf, mask))
     frame = "%s%s%s" % (header, length, buf)
     return frame
-
 
 
 def _parseFrames(frameBuffer, needMask=True):
@@ -268,7 +260,6 @@ def _parseFrames(frameBuffer, needMask=True):
         frameBuffer[:] = []
 
 
-
 class IWebSocketsFrameReceiver(Interface):
     """
     An interface for receiving WebSockets frames.
@@ -285,7 +276,6 @@ class IWebSocketsFrameReceiver(Interface):
         @type transport: L{WebSocketsTransport}.
         """
 
-
     def frameReceived(opcode, data, fin):
         """
         Callback when a frame is received.
@@ -299,7 +289,6 @@ class IWebSocketsFrameReceiver(Interface):
         @type fin: C{bool}
         @param fin: Whether or not the frame is final.
         """
-
 
 
 class WebSocketsTransport(object):
@@ -316,7 +305,6 @@ class WebSocketsTransport(object):
     def __init__(self, transport):
         self._transport = transport
 
-
     def sendFrame(self, opcode, data, fin):
         """
         Build a frame packet and send it over the wire.
@@ -332,7 +320,6 @@ class WebSocketsTransport(object):
         """
         packet = _makeFrame(base64.b64encode(data), opcode, fin)
         self._transport.write(packet)
-
 
     def loseConnection(self, code=STATUSES.NORMAL, reason=""):
         """
@@ -362,7 +349,6 @@ class WebSocketsTransport(object):
             self._transport.loseConnection()
 
 
-
 class WebSocketsProtocol(Protocol):
     """
     A protocol parsing WebSockets frames and interacting with a
@@ -379,10 +365,8 @@ class WebSocketsProtocol(Protocol):
     """
     _buffer = None
 
-
     def __init__(self, receiver):
         self._receiver = receiver
-
 
     def connectionMade(self):
         """
@@ -392,7 +376,6 @@ class WebSocketsProtocol(Protocol):
         log.msg(format="Opening connection with %(peer)s", peer=peer)
         self._buffer = []
         self._receiver.makeConnection(WebSocketsTransport(self.transport))
-
 
     def _parseFrames(self):
         """
@@ -417,7 +400,6 @@ class WebSocketsProtocol(Protocol):
                 self.transport.write(_makeFrame(data, CONTROLS.PONG, True))
             self._receiver.frameReceived(opcode, base64.b64decode(data), fin)
 
-
     def dataReceived(self, data):
         """
         Append the data to the buffer list and parse the whole.
@@ -432,7 +414,6 @@ class WebSocketsProtocol(Protocol):
             # Couldn't parse all the frames, something went wrong, let's bail.
             log.err()
             self.transport.loseConnection()
-
 
 
 @implementer(IWebSocketsFrameReceiver)
@@ -454,7 +435,6 @@ class _WebSocketsProtocolWrapperReceiver():
     def __init__(self, wrappedProtocol):
         self._wrappedProtocol = wrappedProtocol
 
-
     def makeConnection(self, transport):
         """
         Keep a reference to the given C{transport} and instantiate the list of
@@ -462,7 +442,6 @@ class _WebSocketsProtocolWrapperReceiver():
         """
         self._transport = transport
         self._messages = []
-
 
     def frameReceived(self, opcode, data, fin):
         """
@@ -487,7 +466,6 @@ class _WebSocketsProtocolWrapperReceiver():
             self._wrappedProtocol.dataReceived(content)
 
 
-
 class WebSocketsProtocolWrapper(WebSocketsProtocol):
     """
     A L{WebSocketsProtocol} which wraps a regular C{IProtocol} provider,
@@ -509,7 +487,6 @@ class WebSocketsProtocolWrapper(WebSocketsProtocol):
         WebSocketsProtocol.__init__(
             self, _WebSocketsProtocolWrapperReceiver(wrappedProtocol))
 
-
     def makeConnection(self, transport):
         """
         Upon connection, provides the transport interface, and forwards ourself
@@ -522,7 +499,6 @@ class WebSocketsProtocolWrapper(WebSocketsProtocol):
         WebSocketsProtocol.makeConnection(self, transport)
         self.wrappedProtocol.makeConnection(self)
 
-
     def write(self, data):
         """
         Write to the websocket protocol, transforming C{data} in a frame.
@@ -531,7 +507,6 @@ class WebSocketsProtocolWrapper(WebSocketsProtocol):
         @param data: Data buffer used for the frame content.
         """
         self._receiver._transport.sendFrame(self.defaultOpcode, data, True)
-
 
     def writeSequence(self, data):
         """
@@ -543,7 +518,6 @@ class WebSocketsProtocolWrapper(WebSocketsProtocol):
         for chunk in data:
             self.write(chunk)
 
-
     def loseConnection(self):
         """
         Try to lose the connection gracefully when closing by sending a close
@@ -551,13 +525,11 @@ class WebSocketsProtocolWrapper(WebSocketsProtocol):
         """
         self._receiver._transport.loseConnection()
 
-
     def __getattr__(self, name):
         """
         Forward all non-local attributes and methods to C{self.transport}.
         """
         return getattr(self.transport, name)
-
 
     def connectionLost(self, reason):
         """
@@ -568,7 +540,6 @@ class WebSocketsProtocolWrapper(WebSocketsProtocol):
             connection was lost.
         """
         self.wrappedProtocol.connectionLost(reason)
-
 
 
 @implementer(IResource)
@@ -600,7 +571,6 @@ class WebSocketsResource(object):
     def __init__(self, lookupProtocol):
         self._lookupProtocol = lookupProtocol
 
-
     def getChildWithDefault(self, name, request):
         """
         Reject attempts to retrieve a child resource.  All path segments beyond
@@ -616,7 +586,6 @@ class WebSocketsResource(object):
         raise RuntimeError(
             "Cannot get IResource children from WebSocketsResource")
 
-
     def putChild(self, path, child):
         """
         Reject attempts to add a child resource to this resource.  The
@@ -631,7 +600,6 @@ class WebSocketsResource(object):
         """
         raise RuntimeError(
             "Cannot put IResource children under WebSocketsResource")
-
 
     def render(self, request):
         """
@@ -725,7 +693,6 @@ class WebSocketsResource(object):
         protocol.makeConnection(transport)
 
         return NOT_DONE_YET
-
 
 
 def lookupProtocolForFactory(factory):

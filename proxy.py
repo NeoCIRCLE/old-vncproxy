@@ -3,6 +3,7 @@
 # http://musta.sh/2012-03-04/twisted-tcp-proxy.html
 
 import sys
+from os import environ
 
 from twisted.internet import defer
 from twisted.internet import protocol
@@ -15,6 +16,9 @@ from twisted.web.server import Site
 from websockets import WebSocketsResource, lookupProtocolForFactory
 
 from django.core import signing
+
+PROXY_SECRET = environ.get('PROXY_SECRET')
+KEY_MAX_AGE = environ.get('KEY_MAX_AGE', 300)
 
 
 class ProxyClientProtocol(protocol.Protocol):
@@ -61,7 +65,7 @@ class VNCWebSocketHandler(Protocol):
     def makeConnection(self, transport):
         try:
             value = signing.loads(transport.request.args['d'][0],
-                                  key='asdasd', max_age=300)
+                                  key=PROXY_SECRET, max_age=KEY_MAX_AGE)
             port = value['port']
             host = value['host']
         except:

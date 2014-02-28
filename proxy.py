@@ -2,14 +2,12 @@
 # coding: utf-8
 # http://musta.sh/2012-03-04/twisted-tcp-proxy.html
 
-import sys
 from os import environ
 
 from twisted.internet import defer
 from twisted.internet import protocol
 from twisted.internet.protocol import Factory, Protocol
 from twisted.internet import reactor
-from twisted.python import log
 
 from twisted.web.static import File
 from twisted.web.server import Site
@@ -17,38 +15,49 @@ from websockets import WebSocketsResource, lookupProtocolForFactory
 
 from django.core import signing
 
+import optparse
+
+import logging
+logger = logging.getLogger(__name__)
+
 PROXY_SECRET = environ.get('PROXY_SECRET')
 KEY_MAX_AGE = environ.get('KEY_MAX_AGE', 300)
 
 
 class ProxyClientProtocol(protocol.Protocol):
     def connectionMade(self):
-        log.msg("Client: connected to peer")
+        self.dst = '%s:%d' % self.transport.addr
+        logger.info("Client(%s): connected to qemu (%s)",
+                    self.factory.src, self.dst)
         self.cli_queue = self.factory.cli_queue
         self.cli_queue.get().addCallback(self.serverDataReceived)
 
     def serverDataReceived(self, chunk):
         if chunk is False:
             self.cli_queue = None
-            log.msg("Client: disconnecting from peer")
+            logger.info("Client(%s): disconnecting from qemu (%s)",
+                        self.factory.src, self.dst)
             self.factory.continueTrying = False
             self.transport.loseConnection()
         elif self.cli_queue:
-            log.msg("Client: writing %d bytes to peer" % len(chunk))
+            logger.debug("Client(%s): writing %d bytes to qemu (%s)",
+                         self.factory.src, len(chunk), self.dst)
             self.transport.write(chunk)
             self.cli_queue.get().addCallback(self.serverDataReceived)
         else:
             self.factory.cli_queue.put(chunk)
 
     def dataReceived(self, chunk):
-        log.msg("Client: %d bytes received from peer" % len(chunk))
+        logger.debug("Client(%s): %d bytes received from qemu (%s)",
+                     self.factory.src, len(chunk), self.dst)
         self.factory.srv_queue.put(chunk)
 
     def connectionLost(self, why):
         self.factory.srv_queue.put(False)
         if self.cli_queue:
             self.cli_queue = None
-            log.msg("Client: peer disconnected unexpectedly")
+            logger.error("Client(%s): peer disconnected unexpectedly (%s)",
+                         self.factory.src, self.dst)
 
 
 class ProxyClientFactory(protocol.ReconnectingClientFactory):
@@ -56,9 +65,10 @@ class ProxyClientFactory(protocol.ReconnectingClientFactory):
     continueTrying = False
     protocol = ProxyClientProtocol
 
-    def __init__(self, srv_queue, cli_queue):
+    def __init__(self, srv_queue, cli_queue, src):
         self.srv_queue = srv_queue
         self.cli_queue = cli_queue
+        self.src = src
 
 
 class VNCWebSocketHandler(Protocol):
@@ -66,35 +76,45 @@ class VNCWebSocketHandler(Protocol):
         try:
             value = signing.loads(transport.request.args['d'][0],
                                   key=PROXY_SECRET, max_age=KEY_MAX_AGE)
+            try:
+                self.src = transport.request.requestHeaders.getRawHeaders(
+                    'x-real-ip')[0]
+            except:
+                self.src = str(transport.client)
             port = value['port']
             host = value['host']
-        except:
+        except Exception as e:
+            logger.warning('Server(%s): bad connection,  key=%s err=%s',
+                           self.src, transport.request.args['d'][0], e)
             transport.loseConnection()
             return
+        logger.info("Server(%s): new connection, host=%s, port=%s",
+                    self.src, host, port)
         self.transport = transport
         self.srv_queue = defer.DeferredQueue()
         self.cli_queue = defer.DeferredQueue()
         self.srv_queue.get().addCallback(self.clientDataReceived)
 
-        factory = ProxyClientFactory(self.srv_queue, self.cli_queue)
+        factory = ProxyClientFactory(self.srv_queue, self.cli_queue, self.src)
         reactor.connectTCP(host, int(port), factory)
 
     def clientDataReceived(self, chunk):
         if chunk is False:
             self.transport.loseConnection()
         else:
-            log.msg("Server: writing %d bytes to original client" % len(chunk))
+            logger.debug("Server(%s): writing %d bytes to original client",
+                         self.src, len(chunk))
             self.transport.write(chunk)
             self.srv_queue.get().addCallback(self.clientDataReceived)
 
     def dataReceived(self, frame):
-        log.msg("Server: %d bytes received" % len(frame))
+        logger.debug("Server(%s): %d bytes received", self.src, len(frame))
         self.cli_queue.put(frame)
 
     def connectionLost(self, why):
         if hasattr(self, 'cli_queue'):
             self.cli_queue.put(False)
-        log.msg("HELO")
+        logger.info("Server(%s): disconnected", self.src)
 
 
 class VNCWebSocketFactory(Factory):
@@ -102,7 +122,11 @@ class VNCWebSocketFactory(Factory):
 
 
 if __name__ == "__main__":
-    log.startLogging(sys.stdout)
+    parser = optparse.OptionParser()
+    parser.add_option("-I", "--loglevel", dest="loglevel", default='INFO',
+                      help="loglevel")
+    opts, args = parser.parse_args()
+    logging.basicConfig(level=opts.loglevel)
     resource = File('.')
     resource.putChild('vnc', WebSocketsResource(
             lookupProtocolForFactory(VNCWebSocketFactory())))

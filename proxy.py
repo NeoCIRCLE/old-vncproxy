@@ -20,7 +20,7 @@ import optparse
 import logging
 logger = logging.getLogger(__name__)
 
-PROXY_SECRET = environ.get('PROXY_SECRET')
+PROXY_SECRET = environ['PROXY_SECRET']
 KEY_MAX_AGE = environ.get('KEY_MAX_AGE', 300)
 
 
@@ -70,6 +70,11 @@ class ProxyClientFactory(protocol.ReconnectingClientFactory):
         self.cli_queue = cli_queue
         self.src = src
 
+    def clientConnectionFailed(self, connector, reason):
+        self.srv_queue.put(False)
+        logger.error("Client(%s): unable to connect to qemu: %s",
+                     self.src, reason)
+
 
 class VNCWebSocketHandler(Protocol):
     def makeConnection(self, transport):
@@ -84,8 +89,9 @@ class VNCWebSocketHandler(Protocol):
             port = value['port']
             host = value['host']
         except Exception as e:
+            src = getattr(self, 'src', None)
             logger.warning('Server(%s): bad connection,  key=%s err=%s',
-                           self.src, transport.request.args['d'][0], e)
+                           src, transport.request.args['d'][0], e)
             transport.loseConnection()
             return
         logger.info("Server(%s): new connection, host=%s, port=%s",

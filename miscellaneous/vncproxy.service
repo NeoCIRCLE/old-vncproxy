@@ -1,0 +1,13 @@
+[Unit]
+Description=CIRCLE vncproxy
+After=network.target
+
+[Service]
+User=cloud
+Group=cloud
+WorkingDirectory=/home/cloud/vncproxy
+ExecStart=/bin/bash -c "source /etc/profile; workon vncproxy; exec python proxy.py"
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

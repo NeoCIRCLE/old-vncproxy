@@ -33,7 +33,7 @@ class ProxyClientProtocol(protocol.Protocol):
         self.cli_queue.get().addCallback(self.serverDataReceived)
 
     def serverDataReceived(self, chunk):
-        if chunk is False:
+        if not chunk:
             self.cli_queue = None
             logger.info("Client(%s): disconnecting from qemu (%s)",
                         self.factory.src, self.dst)
@@ -105,7 +105,7 @@ class VNCWebSocketHandler(Protocol):
         reactor.connectTCP(host, int(port), factory)
 
     def clientDataReceived(self, chunk):
-        if chunk is False:
+        if not chunk:
             self.transport.loseConnection()
         else:
             logger.debug("Server(%s): writing %d bytes to original client",

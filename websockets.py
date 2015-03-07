@@ -12,10 +12,6 @@ factory.
 @since: 13.2
 """
 
-__all__ = ["WebSocketsResource", "IWebSocketsFrameReceiver",
-           "lookupProtocolForFactory", "WebSocketsProtocol",
-           "WebSocketsProtocolWrapper", "CONTROLS", "STATUSES"]
-
 import base64
 
 from hashlib import sha1
@@ -29,6 +25,11 @@ from twisted.internet.protocol import Protocol
 from twisted.protocols.tls import TLSMemoryBIOProtocol
 from twisted.web.resource import IResource
 from twisted.web.server import NOT_DONE_YET
+
+
+__all__ = ["WebSocketsResource", "IWebSocketsFrameReceiver",
+           "lookupProtocolForFactory", "WebSocketsProtocol",
+           "WebSocketsProtocolWrapper", "CONTROLS", "STATUSES"]
 
 
 class _WSException(Exception):
@@ -457,7 +458,7 @@ class _WebSocketsProtocolWrapperReceiver():
         @type fin: C{bool}
         @param fin: Whether or not the frame is final.
         """
-        if not opcode in (CONTROLS.BINARY, CONTROLS.TEXT, CONTROLS.CONTINUE):
+        if opcode not in (CONTROLS.BINARY, CONTROLS.TEXT, CONTROLS.CONTINUE):
             return
         self._messages.append(data)
         if fin:

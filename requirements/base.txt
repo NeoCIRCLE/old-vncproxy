@@ -1,3 +1,4 @@
+cryptography==2.0
 Django==1.5.4
 Twisted==13.1.0
 pyOpenSSL==0.14
